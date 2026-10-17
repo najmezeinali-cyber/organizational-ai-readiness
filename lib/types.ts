@@ -1,0 +1,20 @@
+export type Domain = 'engineering' | 'procurement' | 'project';
+export type AxisId = 'goal' | 'data' | 'process' | 'people' | 'policy';
+export type Answer = 0 | 1 | 2 | 3 | 'unknown';
+export type Answers = Record<string, Answer>;
+export type Question = { id: string; axis: AxisId; text: string; options: string[]; example: string; actionId: string };
+export type Task = { id: string; title: string; description: string; input: string; control: string };
+export type DomainInfo = { id: Domain; label: string; description: string; tasks: Task[] };
+export type AxisResult = { id: AxisId; label: string; score: number | null; known: number; level: string };
+export type Gate = { id: string; title: string; detail: string; questionIds: string[]; actionId: string };
+export type ActionItem = { id: string; title: string; output: string; done: string; evidence: string[]; kind: 'barrier' | 'clarification' | 'improve' | 'start' };
+export type Recommendation = { id: string; title: string; description: string; reason: string; rank: number; recommended: boolean; prerequisite: string };
+export type Report = {
+  version: string; domain: Domain; task: string; axes: AxisResult[]; gates: Gate[];
+  blockers: ActionItem[]; actions: ActionItem[]; recommendations: Recommendation[];
+  personalized: boolean; policyBlocked: boolean;
+  weeks: { title: string; days: string; body: string; output: string }[];
+  prompt: string; sampleInput: string; expectedOutput: string; worksheet: string[]; answers: Answers;
+};
+export type User = { id: string; name: string; email: string; verified: boolean; role: 'user' | 'admin' };
+export type Assessment = { id: string; domain: Domain; task: string; otherTitle: string; status: 'draft' | 'completed'; revision: number; answers: Answers; report: Report | null; createdAt: string; completedAt: string | null; contentVersion: string };
