@@ -12,7 +12,7 @@ export function db() {
       PRAGMA foreign_keys=ON;
       PRAGMA busy_timeout=5000;
       CREATE TABLE IF NOT EXISTS users (
-        id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE,
+        id TEXT PRIMARY KEY, name TEXT NOT NULL, email TEXT NOT NULL UNIQUE, position TEXT NOT NULL DEFAULT '',
         password TEXT NOT NULL, verified INTEGER NOT NULL DEFAULT 0,
         role TEXT NOT NULL DEFAULT 'user' CHECK(role IN ('user','admin')), created_at TEXT NOT NULL
       );
@@ -41,6 +41,7 @@ export function db() {
       );
       PRAGMA user_version=1;
     `);
+    try { instance.exec("ALTER TABLE users ADD COLUMN position TEXT NOT NULL DEFAULT ''"); } catch { /* existing database already migrated */ }
   }
   if (Date.now() - lastCleanup > 3_600_000) {
     const now = Date.now();

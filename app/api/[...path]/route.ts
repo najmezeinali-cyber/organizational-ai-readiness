@@ -14,7 +14,8 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 const noStore = { 'Cache-Control': 'private, no-store, max-age=0' };
 const json = (body: unknown, status = 200) => NextResponse.json(body, { status, headers: noStore });
-const authSchema = z.object({ action: z.enum(['register', 'login', 'forgot', 'resend', 'verify', 'reset', 'logout', 'delete']), name: z.string().trim().min(2).max(80).optional(), email: z.email().max(254).transform((s) => s.trim().toLowerCase()).optional(), password: z.string().max(128).optional(), token: z.string().min(32).max(128).optional(), consent: z.boolean().optional(), confirmation: z.string().optional() });
+const optionalText = (schema: z.ZodString) => z.preprocess((value) => value === '' ? undefined : value, schema.optional()) as unknown as z.ZodOptional<z.ZodString>;
+const authSchema = z.object({ action: z.enum(['guest-register', 'register', 'login', 'forgot', 'resend', 'verify', 'reset', 'logout', 'delete']), name: optionalText(z.string().trim().min(2).max(80)), email: z.email().max(254).transform((s) => s.trim().toLowerCase()).optional(), position: optionalText(z.string().trim().min(2).max(100)), password: optionalText(z.string().max(128)), token: optionalText(z.string().min(32).max(128)), consent: z.boolean().optional(), confirmation: optionalText(z.string()) });
 const passwordPolicy = (password?: string) => { if (!password || password.length < 10 || password.length > 128) fail(400, 'رمز عبور باید بین ۱۰ تا ۱۲۸ نویسه باشد.'); return password; };
 function setCookie(response: NextResponse, value: string) {
   response.cookies.set(cookieName(), value, { httpOnly: true, secure: settings().production, sameSite: 'lax', path: '/', maxAge: value ? 7 * 86400 : 0 });
@@ -32,6 +33,16 @@ async function account(request: NextRequest) {
   if (!parsed.success) fail(400, 'اطلاعات واردشده معتبر نیست. ایمیل و فیلدها را بررسی کنید.');
   const input = parsed.data;
   const mailNotice = settings().mailMode === 'file' ? 'حالت آزمایش محلی: ایمیل ارسال نشده؛ لینک در صندوق خصوصی .data/outbox برای راه‌انداز سامانه ذخیره می‌شود.' : 'اگر حساب واجد شرایط باشد، پیام ارسال می‌شود. صندوق ایمیل و پوشه هرزنامه را بررسی کنید.';
+  if (input.action === 'guest-register') {
+    if (!input.name || !input.email || !input.position || input.consent !== true) fail(400, 'نام، ایمیل، سمت و پذیرش اطلاعیه حریم خصوصی لازم است.');
+    limit(`guest:${input.email}`, 3, 900000);
+    if (db().prepare('SELECT id FROM users WHERE email=?').get(input.email)) fail(409, 'این ایمیل قبلاً برای یک ارزیابی استفاده شده است. برای شروع آزمایشی از ایمیل دیگری استفاده کنید.');
+    const id = randomUUID();
+    const internalPassword = await passwordHash(randomToken());
+    db().prepare('INSERT INTO users(id,name,email,position,password,verified,created_at) VALUES(?,?,?,?,?,1,?)').run(id, input.name, input.email, input.position, internalPassword, new Date().toISOString());
+    const row = db().prepare('SELECT * FROM users WHERE id=?').get(id)!;
+    return setCookie(json({ ok: true, user: publicUser(row) }), newSession(id));
+  }
   if (['register', 'login', 'forgot', 'resend'].includes(input.action)) {
     if (!input.email) fail(400, 'ایمیل خود را وارد کنید.');
     limit(`${input.action}:${input.email}`, input.action === 'login' ? 12 : 5);
@@ -43,7 +54,12 @@ async function account(request: NextRequest) {
     if (!existing) {
       const id = randomUUID();
       const passwordValue = await passwordHash(password);
-      db().prepare('INSERT INTO users(id,name,email,password,created_at) VALUES(?,?,?,?,?)').run(id, input.name, input.email!, passwordValue, new Date().toISOString());
+      const localPilot = process.env.NODE_ENV === 'development' && settings().mailMode === 'file';
+      db().prepare('INSERT INTO users(id,name,email,password,verified,created_at) VALUES(?,?,?,?,?,?)').run(id, input.name, input.email!, passwordValue, localPilot ? 1 : 0, new Date().toISOString());
+      if (localPilot) {
+        const row = db().prepare('SELECT * FROM users WHERE id=?').get(id)!;
+        return setCookie(json({ ok: true, user: publicUser(row), message: 'حساب آزمایشی محلی فعال شد؛ می‌توانید مستقیماً وارد ارزیابی شوید.' }), newSession(id));
+      }
       await sendAccountEmail(input.email!, newAuthToken(id, 'verify'), 'verify');
     }
     return json({ ok: true, message: `در صورت ثبت حساب جدید، تأیید ایمیل لازم است. اگر حساب دارید وارد شوید. ${mailNotice}` });

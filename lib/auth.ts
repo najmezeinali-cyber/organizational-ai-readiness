@@ -41,13 +41,13 @@ export async function passwordMatches(password: string, stored: string) {
   return timingSafeEqual(actual, Buffer.from(hex, 'hex'));
 }
 export function publicUser(row: Record<string, unknown>): User {
-  return { id: String(row.id), name: String(row.name), email: String(row.email), verified: Boolean(row.verified), role: row.role === 'admin' ? 'admin' : 'user' };
+  return { id: String(row.id), name: String(row.name), email: String(row.email), position: String(row.position || ''), verified: Boolean(row.verified), role: row.role === 'admin' ? 'admin' : 'user' };
 }
 export function session(request: NextRequest) {
   const raw = request.cookies.get(cookieName())?.value;
   if (!raw || raw.length > 150) return null;
   const hash = hashToken(raw);
-  const row = db().prepare(`SELECT u.id,u.name,u.email,u.verified,u.role FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.hash=? AND s.expires>?`).get(hash, Date.now()) as Record<string, unknown> | undefined;
+  const row = db().prepare(`SELECT u.id,u.name,u.email,u.position,u.verified,u.role FROM sessions s JOIN users u ON u.id=s.user_id WHERE s.hash=? AND s.expires>?`).get(hash, Date.now()) as Record<string, unknown> | undefined;
   return row ? { user: publicUser(row), hash } : null;
 }
 export function requireUser(request: NextRequest, verified = true) {

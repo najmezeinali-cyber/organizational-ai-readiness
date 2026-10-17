@@ -16,5 +16,5 @@ export type Report = {
   weeks: { title: string; days: string; body: string; output: string }[];
   prompt: string; sampleInput: string; expectedOutput: string; worksheet: string[]; answers: Answers;
 };
-export type User = { id: string; name: string; email: string; verified: boolean; role: 'user' | 'admin' };
+export type User = { id: string; name: string; email: string; position?: string; verified: boolean; role: 'user' | 'admin' };
 export type Assessment = { id: string; domain: Domain; task: string; otherTitle: string; status: 'draft' | 'completed'; revision: number; answers: Answers; report: Report | null; createdAt: string; completedAt: string | null; contentVersion: string };

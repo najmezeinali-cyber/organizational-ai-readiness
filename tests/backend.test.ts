@@ -35,6 +35,19 @@ await test('password storage uses distinct salts and validates exact password', 
   assert.equal(await passwordMatches('different', one), false);
 });
 
+await test('guest form requires identity fields and starts one protected assessment without email auth', async () => {
+  const missing = await request('POST', 'auth', { action: 'guest-register', name: 'مدیر نمونه', email: 'guest-missing@example.test', consent: true });
+  assert.equal(missing.status, 400);
+  const response = await request('POST', 'auth', { action: 'guest-register', name: 'مدیر مهمان', email: 'guest-flow@example.test', position: 'مدیر پروژه', consent: true });
+  assert.equal(response.status, 200);
+  const user = (await response.json()).user;
+  assert.equal(user.position, 'مدیر پروژه');
+  const cookie = cookieFrom(response);
+  const created = await request('POST', 'assessments', { domain: 'project', task: 'issues' }, cookie);
+  assert.equal(created.status, 200);
+  assert.equal((await request('GET', 'assessments', undefined, cookie)).status, 200);
+});
+
 await test('real account, persistence, ownership, admin privacy and reset lifecycle', async () => {
   const email = 'manager-test@example.test';
   const password = 'test-password-123';
